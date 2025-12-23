@@ -26,12 +26,18 @@ const { data: navigation } = await useAsyncData(
   () => {
     const collection =
       `docs_${locale.value}` as keyof PageCollections;
-    return queryCollectionNavigation(collection);
+    return queryCollectionNavigation(collection, [
+      "to",
+      "hidden",
+      "navigation"
+    ]);
   },
   { watch: [locale] }
 );
 
-console.log("navigation", navigation.value);
+if (import.meta.client && import.meta.dev) {
+  console.log("navigation", navigation.value);
+}
 
 /**
  * 延迟获取搜索索引（仅客户端）

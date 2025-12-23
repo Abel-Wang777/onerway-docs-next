@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { PageCollections } from "@nuxt/content";
-import { findPageBreadcrumb } from "@nuxt/content/utils";
+import { findPageBreadcrumb } from "~/composables/useDocsNav";
 import {
   NAVIGATION_KEY,
   CURRENT_PAGE_STATE_KEY,
@@ -32,7 +32,7 @@ const { addPage } = useRecentPages();
 const navigation = inject(NAVIGATION_KEY);
 
 const { data: page } = await useAsyncData(
-  route.path,
+  `${route.path}-${locale.value}`,
   () => {
     const collection =
       `docs_${locale.value}` as keyof PageCollections;
@@ -40,10 +40,10 @@ const { data: page } = await useAsyncData(
       .path(route.path)
       .first();
   },
-  { watch: [locale] }
+  { watch: [() => locale.value] }
 );
 
-if (import.meta.client) {
+if (import.meta.client && import.meta.dev) {
   console.log("[slug] page", page.value);
 }
 
@@ -64,7 +64,7 @@ watchEffect(() => {
 });
 
 const { data: surround } = await useAsyncData(
-  `${route.path}-surround`,
+  `${route.path}-${locale.value}-surround`,
   () => {
     const collection =
       `docs_${locale.value}` as keyof PageCollections;
@@ -76,7 +76,7 @@ const { data: surround } = await useAsyncData(
       }
     );
   },
-  { watch: [locale] }
+  { watch: [() => locale.value] }
 );
 
 const title = page.value.seo?.title || page.value.title;
@@ -96,9 +96,9 @@ const breadcrumb = computed(() =>
     findPageBreadcrumb(
       navigation?.value,
       page.value?.path,
-      { indexAsChild: true }
+      { current: true, indexAsChild: true }
     )
-  ).map(({ icon, ...link }) => link)
+  )
 );
 
 // 处理路由切换和初始 hash 的滚动行为
@@ -124,7 +124,11 @@ watch(
         path: newPage.path || route.path,
         title: newPage.title || "",
         description: newPage.description,
-        icon: newPage.icon || "i-heroicons-document-text",
+        icon:
+          newPage.navigation === true
+            ? "i-lucide-file"
+            : (newPage.navigation as { icon?: string })
+                ?.icon,
       });
     }
   },
@@ -140,6 +144,9 @@ watch(
     <div class="min-w-0">
       <UBreadcrumb
         v-if="breadcrumb.length"
+        :ui="{
+          list: 'flex-wrap',
+        }"
         :items="breadcrumb" />
       <UPageHeader
         :title="page?.title ?? ''"

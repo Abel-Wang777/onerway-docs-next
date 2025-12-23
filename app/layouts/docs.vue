@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useDocsNav } from "~/composables/useDocsNav";
+import { useNavigationMenuTriggerClick } from "~/composables/useNavigationMenuTriggerClick";
 import {
   NAVIGATION_KEY,
   CURRENT_PAGE_STATE_KEY,
@@ -21,52 +22,60 @@ const page = useState<DocPage | null>(
 const { currentModuleMenu, currentModuleKey } = useDocsNav(
   navigation as Ref<ContentNavigationItem[]>
 );
+
+// 处理 trigger 类型菜单项的"展开 + 跳转"功能
+const { handleClick: handleNavigationClick } =
+  useNavigationMenuTriggerClick();
 </script>
 
 <template>
   <!-- 外层容器，垂直排列 header、主体和 footer -->
   <UContainer>
     <!-- 主体区域：DashboardGroup 管理 sidebar 和正文 -->
-    <UDashboardGroup>
+    <UDashboardGroup unit="px">
       <!-- 左侧侧边栏：依据 front‑matter 的 showNavigation 控制是否显示 -->
       <UDashboardSidebar
         v-if="page?.navigation !== false"
         resizable
+        :min-size="256"
+        :max-size="320"
+        :default-size="288"
+        class="min-w-64"
         :ui="{
           body: 'pt-layout px-4',
         }">
-        <template #toggle>
-          <UDashboardSidebarToggle variant="subtle" />
-        </template>
-
         <template #default>
-          <!-- 导航菜单：key 确保模块切换时重新渲染，使 defaultOpen 生效 -->
-          <UNavigationMenu
-            :key="currentModuleKey"
-            orientation="vertical"
-            variant="link"
-            trailing-icon="i-lucide-chevron-right"
-            :items="currentModuleMenu">
-            <!-- 
-              自定义前缀：箭头 + 图标
-              使用占位符方案确保所有菜单项完美对齐
-            -->
-            <template #item-label="{ item }">
-              <div
-                :class="[
-                  'flex gap-2 cursor-pointer whitespace-normal wrap-break-word text-pretty',
-                  item.module
-                    ? 'cursor-text select-text inline-block'
-                    : '',
-                ]">
+          <!-- 事件委托容器：捕获导航菜单的点击事件，实现 trigger + 跳转 -->
+          <div @click.capture="handleNavigationClick">
+            <!-- 导航菜单：key 确保模块切换时重新渲染，使 defaultOpen 生效 -->
+            <UNavigationMenu
+              :key="currentModuleKey"
+              orientation="vertical"
+              variant="link"
+              trailing-icon="i-lucide-chevron-right"
+              :items="currentModuleMenu"
+              :ui="{
+                linkLabel:
+                  'whitespace-normal wrap-break-word text-pretty line-clamp-2 lg:line-clamp-none',
+              }">
+              <!--
+                slot 添加 data-nav-to 属性，用于 trigger + 跳转功能
+                仅当父级菜单有独立页面（to 与 children[0].to 不同）时才启用跳转
+              -->
+              <template #item-label="{ item }">
                 <span
-                  :title="item.label"
-                  class="line-clamp-2 lg:line-clamp-none"
-                  >{{ item.label }}</span
-                >
-              </div>
-            </template>
-          </UNavigationMenu>
+                  :data-nav-to="
+                    item.type === 'trigger' &&
+                    item.to &&
+                    item.children?.[0]?.to !== item.to
+                      ? item.to
+                      : undefined
+                  ">
+                  {{ item.label }}
+                </span>
+              </template>
+            </UNavigationMenu>
+          </div>
         </template>
       </UDashboardSidebar>
 

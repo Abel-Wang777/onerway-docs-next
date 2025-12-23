@@ -18,6 +18,16 @@ const commonSchema = z.object({
   showFooter: z.boolean().default(true),
 
   /**
+   * 控制导航条目（用于菜单）的跳转路径
+   */
+  to: z.string().optional(),
+
+  /**
+   * 控制导航条目（用于菜单）是否隐藏
+   */
+  hidden: z.boolean().default(false),
+
+  /**
    * 控制导航条目（用于菜单）是否显示或自定义标题
    */
   navigation: z
@@ -38,8 +48,9 @@ export default defineContentConfig({
     docs_en: defineCollection({
       type: "page",
       source: {
-        include: "en/**", // 匹配 en 目录及子目录中的文件
-        prefix: "", // 不在 URL 中添加语言前缀 [oai_citation:0‡content.nuxt.com](https://content.nuxt.com/docs/integrations/i18n#:~:text=collections%3A%20,schema%3A%20commonSchema%2C)
+        include: "en/**",
+        exclude: ["**/_partials/**"], // 排除 _partials，不作为独立页面
+        prefix: "",
       },
       schema: commonSchema,
     }),
@@ -48,9 +59,25 @@ export default defineContentConfig({
       type: "page",
       source: {
         include: "zh_cn/**",
-        prefix: "", // 同样不带前缀
+        exclude: ["**/_partials/**"], // 排除 _partials，不作为独立页面
+        prefix: "",
       },
       schema: commonSchema,
+    }),
+
+    /**
+     * Partials 集合：用于 @include 语法引用的片段文件
+     *
+     * 使用 type: "data" 而非 "page"：
+     * - 不会作为独立页面被索引
+     * - 但仍被 Nuxt Content 导入和追踪
+     * - 修改时能触发 Content 的 HMR 机制
+     */
+    partials: defineCollection({
+      type: "data",
+      source: {
+        include: "**/_partials/**/*.md",
+      },
     }),
   },
 });

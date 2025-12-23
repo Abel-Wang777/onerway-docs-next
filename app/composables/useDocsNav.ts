@@ -13,21 +13,72 @@ export interface DocsNavOptions {
 }
 
 /**
- * 扩展的导航菜单项，包含自定义字段
- */
-interface ExtendedNavigationMenuItem
-  extends NavigationMenuItem {
-  module?: boolean;
-}
-
-/**
  * 归一化的模块结构
  * root：顶层模块菜单项（包含子菜单）
  * menu：模块的子菜单（不包含模块节点）
  */
 interface NormalizedModule {
-  root: ExtendedNavigationMenuItem;
-  menu: ExtendedNavigationMenuItem[];
+  root: NavigationMenuItem;
+  menu: NavigationMenuItem[];
+}
+
+/**
+ * 查找页面面包屑导航，过滤掉 page === false 的导航项
+ *
+ * 这是基于 @nuxt/content/utils 的 findPageBreadcrumb 的自定义版本，
+ * 增加了对 page === false 导航项的过滤逻辑。
+ *
+ * @param navigation - 导航树
+ * @param path - 当前页面路径
+ * @param options - 配置选项
+ * @returns 面包屑数组
+ */
+export function findPageBreadcrumb(
+  navigation: ContentNavigationItem[] | undefined,
+  path: string | undefined,
+  options?: { current?: boolean; indexAsChild?: boolean }
+): ContentNavigationItem[] {
+  if (!navigation?.length || !path) {
+    return [];
+  }
+
+  return navigation.reduce(
+    (breadcrumb: ContentNavigationItem[], link) => {
+      if (
+        path &&
+        (path + "/").startsWith(link.path + "/")
+      ) {
+        // 只有当 page !== false 时才添加到面包屑
+        if (
+          link.page !== false &&
+          (path !== link.path ||
+            options?.current ||
+            (options?.indexAsChild && link.children))
+        ) {
+          breadcrumb.push(link);
+        }
+
+        // 仍然递归检查子节点（不过滤子节点的 page 属性）
+        if (link.children) {
+          breadcrumb.push(
+            ...findPageBreadcrumb(
+              link.children.filter(
+                (c: ContentNavigationItem) =>
+                  c.path !== link.path ||
+                  (c.path === path &&
+                    options?.current &&
+                    options?.indexAsChild)
+              ),
+              path,
+              options
+            )
+          );
+        }
+      }
+      return breadcrumb;
+    },
+    []
+  );
 }
 
 /**
@@ -57,14 +108,16 @@ export function useDocsNav(
   function determineMenuItemType(
     item: ContentNavigationItem,
     hasChildren: boolean
-  ): ExtendedNavigationMenuItem["type"] {
+  ): NavigationMenuItem["type"] {
+    // 如果指定了 type，则直接返回
+    if (item.type)
+      return item.type as NavigationMenuItem["type"];
+
     // 子节点优先：即便该节点本身不可点击，也应作为可展开的 trigger
     if (hasChildren) return "trigger";
 
     // 不生成页面且无子节点：作为纯文本分组/标签渲染
     if (item.page === false) return "label";
-    // 普通页面链接
-    return "link";
   }
 
   /**
@@ -72,7 +125,7 @@ export function useDocsNav(
    * 包括：icon、badge、trailingIcon、module 等
    */
   function applyCustomFields(
-    menuItem: ExtendedNavigationMenuItem,
+    menuItem: NavigationMenuItem,
     item: ContentNavigationItem
   ): void {
     if (item.icon) {
@@ -84,9 +137,8 @@ export function useDocsNav(
     if (item.trailingIcon) {
       menuItem.trailingIcon = item.trailingIcon;
     }
-    // 只有模块节点（无独立页面）才标记为 module
+    // 无独立页面时，不显示图标
     if (item.page === false) {
-      menuItem.module = true;
       if (!menuItem.icon) {
         menuItem.icon = "";
       }
@@ -98,7 +150,7 @@ export function useDocsNav(
    * @param isFirstItem - 是否为同级中第一个 item（第一个不需要顶部边框）
    */
   function applyModuleStyling(
-    menuItem: ExtendedNavigationMenuItem,
+    menuItem: NavigationMenuItem,
     item: ContentNavigationItem,
     isFirstItem = false
   ): void {
@@ -135,23 +187,27 @@ export function useDocsNav(
     item: ContentNavigationItem,
     level = 1,
     isFirstItem = false
-  ): ExtendedNavigationMenuItem {
+  ): NavigationMenuItem {
+    if (item.hidden === true)
+      return null as unknown as NavigationMenuItem;
+
     // 处理子节点时，传递索引判断是否为第一个 item
     const children = item.children
       ?.map((child, index) =>
         transformToMenuItem(child, level + 1, index === 0)
       )
-      .filter(Boolean) as
-      | ExtendedNavigationMenuItem[]
-      | undefined;
+      .filter(Boolean) as NavigationMenuItem[] | undefined;
 
     const hasChildren = Boolean(
       children && children.length > 0
     );
 
-    const menuItem: ExtendedNavigationMenuItem = {
+    const menuItem: NavigationMenuItem = {
       label: item.title,
-      to: item.page === false ? undefined : item.path,
+      to:
+        item.page === false
+          ? undefined
+          : (item.to ?? item.path),
       type: determineMenuItemType(item, hasChildren),
       children: hasChildren ? children : undefined,
     };
@@ -171,7 +227,7 @@ export function useDocsNav(
    * @returns 是否有节点被标记为活动
    */
   function markActiveAndExpandParents(
-    items: ExtendedNavigationMenuItem[],
+    items: NavigationMenuItem[],
     currentPath: string
   ): boolean {
     let hasActiveChild = false;
@@ -187,7 +243,7 @@ export function useDocsNav(
       // 递归检查子节点
       if (item.children) {
         const childIsActive = markActiveAndExpandParents(
-          item.children as ExtendedNavigationMenuItem[],
+          item.children as NavigationMenuItem[],
           currentPath
         );
         if (childIsActive) {
@@ -221,8 +277,7 @@ export function useDocsNav(
         markActiveAndExpandParents([rootItem], route.path);
 
         const menu =
-          (rootItem.children as ExtendedNavigationMenuItem[]) ??
-          [];
+          (rootItem.children as NavigationMenuItem[]) ?? [];
 
         return {
           root: rootItem,
@@ -238,7 +293,7 @@ export function useDocsNav(
    * @returns 第一个找到的路径，如果没有则返回 null
    */
   function findFirstPath(
-    items: ExtendedNavigationMenuItem[]
+    items: NavigationMenuItem[]
   ): string | null {
     for (const item of items) {
       if (item.to && typeof item.to === "string") {
@@ -246,7 +301,7 @@ export function useDocsNav(
       }
       if (item.children) {
         const found = findFirstPath(
-          item.children as ExtendedNavigationMenuItem[]
+          item.children as NavigationMenuItem[]
         );
         if (found) return found;
       }
@@ -259,7 +314,7 @@ export function useDocsNav(
    * 包含完整的嵌套结构
    */
   const topLevelModules = computed(
-    (): ExtendedNavigationMenuItem[] =>
+    (): NavigationMenuItem[] =>
       normalizedModules.value.map((mod) => mod.root)
   );
 
@@ -268,7 +323,7 @@ export function useDocsNav(
    * 适用于 Header 水平导航，只显示模块名称作为链接
    */
   const topLevelModuleLinks = computed(
-    (): ExtendedNavigationMenuItem[] =>
+    (): NavigationMenuItem[] =>
       normalizedModules.value.map((mod) => ({
         label: mod.root.label,
         to:
@@ -285,7 +340,7 @@ export function useDocsNav(
    * 根据 includeModules 输出：顶层+子菜单 或仅子菜单
    */
   const navigationItems = computed(
-    (): ExtendedNavigationMenuItem[] => {
+    (): NavigationMenuItem[] => {
       if (includeModules) {
         return topLevelModules.value;
       }
@@ -335,7 +390,7 @@ export function useDocsNav(
   );
 
   const currentModuleMenu = computed(
-    (): ExtendedNavigationMenuItem[] =>
+    (): NavigationMenuItem[] =>
       currentModule.value?.menu ?? []
   );
 
