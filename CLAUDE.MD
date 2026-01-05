@@ -112,6 +112,8 @@ onerway-docs-next2/
 - **ProseInlineBlocks**：强制块级元素在同一行内联渲染
 - **ProseLinkSwitch**：多链接选择器，支持预设（如沙盒/生产环境的商户后台切换）
 - **ProseTabs/ProseTabsItem**：增强的标签页组件，支持多种变体（pill、link、underline、segment），localStorage 同步，可滚动的标签页头部（带左右控制），自动滚动到活动标签，以及动态 TOC 集成
+- **ProseMermaid**：Mermaid 图表渲染，支持拖拽缩放（Alt+拖拽/滚轮）、全屏预览、点状背景、骨架屏加载、明暗主题适配
+- **ProsePre**：代码块包装器，拦截 `language="mermaid"` 并保留 Nuxt UI 完整功能（复制按钮、文件名、行高亮）
 - **AppHeader**：主导航头部
 - **AppHeaderMobileNav**：移动端友好的导航菜单
 - **AppLogo**：应用 Logo 组件
@@ -204,15 +206,17 @@ pnpm preview
 - **scope**: 可选，影响范围（如组件名、模块名）
 - **body**: 可选但推荐，使用 `-` bullet points 详细说明每个改动
 - **footer**: 可选，Breaking Changes 或关联 issue
+- **优先使用中文**：commit message 优先使用中文编写，以提升团队协作效率
+- **不要添加 AI 生成标识**：commit message 中不包含 "Generated with Claude Code" 或 "Co-Authored-By: Claude" 等 AI 标识
 
 ### 示例
 ```
-feat(ProseA): add badge support for MDC links
+feat(ProseA): 为 MDC 链接添加徽章支持
 
-- Introduced badge prop to display labels on links
-- Added UBadge component rendering between text and icons
-- Enhanced link styling with increased gap spacing
-- Maintained full backward compatibility
+- 新增 badge 属性用于在链接上显示标签
+- 在文本和图标之间渲染 UBadge 组件
+- 增加链接间距以改善样式
+- 保持完全向后兼容
 
 Closes #123
 ```
@@ -255,6 +259,7 @@ Closes #123
 - 使用正确的标题层级（h1-h4）
 - 正确引用内部链接
 - 添加 SEO 元数据
+- **MDC 组件嵌套**：使用冒号数量表示层级（`::` → `:::` → `::::` → `:::::`），详见 `content/CLAUDE.md`
 
 ## 最佳实践
 
@@ -283,7 +288,13 @@ Closes #123
 4. **样式问题**：检查 `nuxt.config.ts` 中的 CSS 导入顺序
 
 ## 相关资源
+
+### 官方文档
 - [Nuxt 文档](https://nuxt.com/docs)
 - [Nuxt Content](https://content.nuxt.com/)
 - [Nuxt UI](https://ui.nuxt.com/)
 - [Nuxt i18n](https://i18n.nuxtjs.org/)
+
+### 项目技术文档
+- [Nuxt Content & MDC 技术架构深度解析](docs/technical-references/nuxt-content-architecture.md) - Remark/Rehype 插件系统详解、自定义插件开发指南
+- [Task List 可交互功能调研](docs/investigations/task-list-investigation.md) - 可交互任务列表的实现方案对比与技术细节
